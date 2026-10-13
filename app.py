@@ -134,6 +134,11 @@ def predict():
         risk_prob=round(risk.probability * 100, 1),
         diet=diet,
         metrics=model_metrics,
+        # Band edges for the risk gauge on the results page
+        thresholds={
+            "screening": model_bundle["screening_threshold"],
+            "decision": model_bundle["decision_threshold"],
+        },
     )
 
 

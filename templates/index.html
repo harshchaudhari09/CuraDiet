@@ -1,124 +1,260 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CuraDiet — Diabetes Risk & Diet Planner</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <div class="container">
-    <h1>CuraDiet</h1>
-    <p class="subtitle">Diabetes risk check + a personalized diet plan</p>
+{% extends "base.html" %}
+{% block body_class %}page-home{% endblock %}
 
-    {% if metrics %}
-    <div class="stats">
-      <div><strong>{{ metrics.accuracy }}%</strong><span>test accuracy</span></div>
-      <div><strong>{{ metrics.roc_auc }}</strong><span>ROC-AUC</span></div>
-      <div><strong>{{ "{:,}".format(metrics.n_test) }}</strong><span>held-out patients</span></div>
-    </div>
-    {% endif %}
-
-    <div class="notice">
-      <strong>Note:</strong> the risk model is trained on ~96,000 anonymised patient records
-      (men and women, ages 18–80+) and checked against ADA diagnostic cut-offs. It is a
-      screening aid built as a student project — <strong>not medical advice or a diagnosis</strong>.
+{% block content %}
+<header class="hero" id="top">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow hero-in" style="--d:.1s">Diabetes risk check · personalised diet plan</p>
+      <h1 class="hero-title">
+        <span class="line"><span style="--d:.2s">Know your risk.</span></span>
+        <span class="line"><span style="--d:.32s"><em>Eat for it.</em></span></span>
+      </h1>
+      <p class="hero-sub hero-in" style="--d:.6s">Enter your age, weight, HbA1c, glucose and blood pressure. A machine-learning model trained on ~96,000 patient records estimates your diabetes risk, official ADA cut-offs double-check it, and CuraDiet turns the result into a daily calorie, macro and meal plan.</p>
+      <div class="hero-ctas hero-in" style="--d:.75s">
+        <a class="btn btn-primary" href="#check" data-scroll>Check my risk ↓</a>
+        <a class="btn btn-ghost" href="/?example=1#check">Try an example profile</a>
+      </div>
+      <p class="hero-note hero-in" style="--d:.9s">A screening aid, not a diagnosis · takes about a minute</p>
     </div>
 
-    {% if startup_error %}
-      <div class="errors"><strong>Setup needed:</strong> {{ startup_error }}</div>
-    {% endif %}
-
-    {% if errors %}
-      <div class="errors" role="alert">
-        <strong>Please fix the following:</strong>
-        <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
-      </div>
-    {% endif %}
-
-    <form action="/predict" method="post" novalidate>
-      <fieldset>
-        <legend>About you</legend>
-        <div class="grid">
-          <label>Age (years)
-            <input type="number" name="age" min="18" max="100" value="{{ values.get('age', '') }}" required>
-          </label>
-
-          <label>Sex
-            <select name="gender">
-              {% for g in genders %}
-                <option value="{{ g }}" {% if values.get('gender') == g %}selected{% endif %}>{{ g }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label>Height (cm)
-            <input type="number" step="0.1" name="height_cm" min="120" max="230" value="{{ values.get('height_cm', '') }}" required>
-          </label>
-
-          <label>Weight (kg)
-            <input type="number" step="0.1" name="weight_kg" min="30" max="300" value="{{ values.get('weight_kg', '') }}" required>
-          </label>
-
-          <label>Activity level
-            <select name="activity">
-              {% for a in activities %}
-                <option value="{{ a }}" {% if values.get('activity') == a %}selected{% endif %}>{{ a|capitalize }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label>Smoking history
-            <select name="smoking_history">
-              {% for key, label in smoking_options.items() %}
-                <option value="{{ key }}" {% if values.get('smoking_history') == key %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </label>
+    <div class="hero-visual hero-in" style="--d:.45s" aria-label="Example result">
+      <div class="float-chip chip-a"><span class="dot dot-amber"></span>HbA1c 6.1% · prediabetes range</div>
+      <div class="float-chip chip-b"><span class="dot dot-green"></span>Sodium under 1,500 mg</div>
+      <div class="demo-card" id="demoCard">
+        <div class="demo-head">
+          <span class="tag">Example result</span>
+          <span class="level-chip level-elevated">Risk · Elevated</span>
         </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Lab values & vitals</legend>
-        <div class="grid">
-          <label>HbA1c (%)
-            <input type="number" step="0.1" name="hba1c" min="3.5" max="15" value="{{ values.get('hba1c', '') }}" required>
-            <small>From a recent blood test. Typical non-diabetic range is 4.0–5.6%.</small>
-          </label>
-
-          <label>Blood glucose (mg/dL)
-            <input type="number" step="1" name="glucose" min="50" max="400" value="{{ values.get('glucose', '') }}" required>
-            <small>If you have mmol/L, multiply by 18.</small>
-          </label>
-
-          <label>Systolic BP (upper, mmHg)
-            <input type="number" name="systolic" min="70" max="250" value="{{ values.get('systolic', '') }}" required>
-          </label>
-
-          <label>Diastolic BP (lower, mmHg)
-            <input type="number" name="diastolic" min="40" max="150" value="{{ values.get('diastolic', '') }}" required>
-          </label>
+        <p class="demo-label">Weight-loss + diabetes-friendly plan</p>
+        <div class="demo-main">
+          <div class="donut donut-sm" style="--p:25;--c:40;--f:35">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="donut-track" cx="60" cy="60" r="50" pathLength="100"/>
+              <circle class="donut-seg seg-protein" cx="60" cy="60" r="50" pathLength="100"/>
+              <circle class="donut-seg seg-carbs" cx="60" cy="60" r="50" pathLength="100"/>
+              <circle class="donut-seg seg-fat" cx="60" cy="60" r="50" pathLength="100"/>
+            </svg>
+            <div class="donut-center"><b data-count="1900" data-format="comma">1,900</b><span>kcal / day</span></div>
+          </div>
+          <ul class="macro-legend">
+            <li><i class="sw sw-protein"></i>Protein <b>119 g</b></li>
+            <li><i class="sw sw-carbs"></i>Carbs <b>190 g</b></li>
+            <li><i class="sw sw-fat"></i>Fat <b>74 g</b></li>
+          </ul>
         </div>
-
-        <label class="check">
-          <input type="checkbox" name="glucose_fasting" {% if values.get('glucose_fasting') %}checked{% endif %}>
-          The glucose reading was taken fasting (no food for 8+ hours)
-        </label>
-        <label class="check">
-          <input type="checkbox" name="hypertension_dx" {% if values.get('hypertension_dx') %}checked{% endif %}>
-          I've been diagnosed with high blood pressure
-        </label>
-        <label class="check">
-          <input type="checkbox" name="heart_disease" {% if values.get('heart_disease') %}checked{% endif %}>
-          I've been diagnosed with heart disease
-        </label>
-      </fieldset>
-
-      <div class="actions">
-        <button type="submit">Get my plan</button>
-        <a href="/?example=1" class="example-link">Just exploring? Fill in an example profile</a>
+        <div class="demo-meals">
+          <div><span>Breakfast</span><i style="--w:83%"></i><b>475</b></div>
+          <div><span>Lunch</span><i style="--w:100%"></i><b>570</b></div>
+          <div><span>Dinner</span><i style="--w:83%"></i><b>475</b></div>
+          <div><span>Snacks</span><i style="--w:67%"></i><b>380</b></div>
+        </div>
       </div>
-    </form>
+    </div>
   </div>
-</body>
-</html>
+</header>
+
+{% if metrics %}
+<section class="stats-band">
+  <div class="wrap stats-grid">
+    <div class="stat reveal"><b><span data-count="{{ metrics.accuracy }}" data-decimals="1">{{ metrics.accuracy }}</span>%</b><span>accuracy on patients the model never saw</span></div>
+    <div class="stat reveal" data-delay="1"><b><span data-count="{{ metrics.roc_auc }}" data-decimals="3">{{ metrics.roc_auc }}</span></b><span>ROC-AUC</span></div>
+    <div class="stat reveal" data-delay="2"><b><span data-count="{{ metrics.screening_recall }}" data-decimals="1">{{ metrics.screening_recall }}</span>%</b><span>of diabetes cases caught in screening mode</span></div>
+    <div class="stat reveal" data-delay="3"><b><span data-count="{{ metrics.n_test }}" data-format="comma">{{ "{:,}".format(metrics.n_test) }}</span></b><span>held-out test patients</span></div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section" id="how">
+  <div class="wrap">
+    <p class="eyebrow reveal">01 — How it works</p>
+    <h2 class="reveal" data-delay="1">From a blood test to a plate, <em>in three steps.</em></h2>
+    <div class="steps" id="steps">
+      <div class="steps-line" aria-hidden="true"><span></span></div>
+      <article class="step reveal">
+        <span class="step-num">01</span>
+        <h3>Your profile</h3>
+        <p>Age, sex, height and weight, activity, smoking history — plus HbA1c, blood glucose and blood pressure from a recent check-up.</p>
+      </article>
+      <article class="step reveal" data-delay="1">
+        <span class="step-num">02</span>
+        <h3>Risk = model + clinical rules</h3>
+        <p>A HistGradientBoosting model estimates the probability of diabetes. Official ADA cut-offs for HbA1c and glucose sit on top as a safety layer — they can raise your risk level, never lower it.</p>
+      </article>
+      <article class="step reveal" data-delay="2">
+        <span class="step-num">03</span>
+        <h3>A plan for your day</h3>
+        <p>Calories from the Mifflin-St Jeor equation, macros and limits from ADA and DASH guidance, split across your meals — with foods to eat more of and foods to limit.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+{% if metrics %}
+<section class="section section-tint" id="model">
+  <div class="wrap">
+    <p class="eyebrow reveal">02 — The model</p>
+    <h2 class="reveal" data-delay="1">Three models compared. <em>The best one ships.</em></h2>
+    <p class="lede reveal" data-delay="2">Trained on {{ "{:,}".format(metrics.n_train) }} patient records and tested on {{ "{:,}".format(metrics.n_test) }} it never saw — men and women aged 18 to 80+.</p>
+
+    <div class="model-grid">
+      <div class="panel reveal" id="cvBars">
+        <p class="panel-k">Cross-validated ROC-AUC</p>
+        {% for m in metrics.cv %}
+        <div class="cv-row{% if m.name == metrics.model %} is-best{% endif %}">
+          <div class="cv-label"><span>{{ m.name }}</span>{% if m.name == metrics.model %}<em>chosen</em>{% endif %}</div>
+          <div class="cv-track"><i style="--w:{{ ((m.roc_auc - 0.9) / 0.1 * 100)|round(1) }}%"></i></div>
+          <b>{{ "%.3f"|format(m.roc_auc) }}</b>
+        </div>
+        {% endfor %}
+        <p class="panel-foot">Bars start at 0.90 so the differences are visible.</p>
+      </div>
+
+      <div class="panel reveal" data-delay="1">
+        <p class="panel-k">Why accuracy alone can mislead</p>
+        <p class="panel-text">Only {{ metrics.prevalence }}% of patients in the data have diabetes, so a model that always says “no” would already score {{ metrics.baseline_accuracy }}%. CuraDiet reaches <strong>{{ metrics.accuracy }}%</strong> — and what matters more is how many real cases it catches:</p>
+        <div class="threshold-cards">
+          <div class="tcard">
+            <span class="tcard-k">Default mode</span>
+            <b>{{ metrics.recall }}%</b>
+            <span>of cases caught, with very few false alarms</span>
+          </div>
+          <div class="tcard tcard-on">
+            <span class="tcard-k">Screening mode · flags “Elevated”</span>
+            <b>{{ metrics.screening_recall }}%</b>
+            <span>of cases caught — more sensitive, so fewer are missed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section" id="check">
+  <div class="wrap check-wrap">
+    <div class="check-intro">
+      <p class="eyebrow reveal">03 — Check my risk</p>
+      <h2 class="reveal" data-delay="1">Your numbers, <em>your plan.</em></h2>
+      <p class="lede reveal" data-delay="2">You'll need values from a recent blood test. Nothing you enter is stored.</p>
+      <div class="notice reveal" data-delay="3">
+        <strong>Before you start:</strong> the risk model is trained on ~96,000 anonymised patient records (men and women, ages 18–80+) and checked against ADA diagnostic cut-offs. It is a screening aid built as a student project — <strong>not medical advice or a diagnosis</strong>.
+      </div>
+      <a href="/?example=1#check" class="example-link reveal" data-delay="3">Just exploring? Fill in an example profile →</a>
+    </div>
+
+    <div class="form-card reveal" data-delay="1">
+      {% if startup_error %}
+        <div class="alert alert-error"><strong>Setup needed:</strong> {{ startup_error }}</div>
+      {% endif %}
+
+      {% if errors %}
+        <div class="alert alert-error" role="alert">
+          <strong>Please fix the following:</strong>
+          <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+
+      {# The step-by-step view only kicks in for a fresh form; with errors or a
+         pre-filled example every section is shown at once. #}
+      <form action="/predict" method="post" novalidate id="riskForm" data-stepper="{{ 'off' if (errors or values) else 'on' }}">
+        <div class="progress" aria-hidden="true">
+          <div class="progress-steps">
+            <span class="ps is-on" data-for="0">About you</span>
+            <span class="ps" data-for="1">Labs &amp; vitals</span>
+            <span class="ps" data-for="2">Conditions</span>
+          </div>
+          <div class="progress-bar"><i></i></div>
+        </div>
+
+        <fieldset class="fstep" data-step="0">
+          <legend>About you</legend>
+          <div class="grid">
+            <label class="field">Age (years)
+              <input type="number" name="age" min="18" max="100" value="{{ values.get('age', '') }}" required>
+            </label>
+
+            <label class="field">Sex
+              <select name="gender">
+                {% for g in genders %}
+                  <option value="{{ g }}" {% if values.get('gender') == g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label class="field">Height (cm)
+              <input type="number" step="0.1" name="height_cm" min="120" max="230" value="{{ values.get('height_cm', '') }}" required>
+            </label>
+
+            <label class="field">Weight (kg)
+              <input type="number" step="0.1" name="weight_kg" min="30" max="300" value="{{ values.get('weight_kg', '') }}" required>
+            </label>
+
+            <label class="field">Activity level
+              <select name="activity">
+                {% for a in activities %}
+                  <option value="{{ a }}" {% if values.get('activity') == a %}selected{% endif %}>{{ a|capitalize }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label class="field">Smoking history
+              <select name="smoking_history">
+                {% for key, label in smoking_options.items() %}
+                  <option value="{{ key }}" {% if values.get('smoking_history') == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="fstep" data-step="1">
+          <legend>Lab values &amp; vitals</legend>
+          <div class="grid">
+            <label class="field">HbA1c (%)
+              <input type="number" step="0.1" name="hba1c" min="3.5" max="15" value="{{ values.get('hba1c', '') }}" required>
+              <small>From a recent blood test. Typical non-diabetic range is 4.0–5.6%.</small>
+            </label>
+
+            <label class="field">Blood glucose (mg/dL)
+              <input type="number" step="1" name="glucose" min="50" max="400" value="{{ values.get('glucose', '') }}" required>
+              <small>If you have mmol/L, multiply by 18.</small>
+            </label>
+
+            <label class="field">Systolic BP (upper, mmHg)
+              <input type="number" name="systolic" min="70" max="250" value="{{ values.get('systolic', '') }}" required>
+            </label>
+
+            <label class="field">Diastolic BP (lower, mmHg)
+              <input type="number" name="diastolic" min="40" max="150" value="{{ values.get('diastolic', '') }}" required>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="fstep" data-step="2">
+          <legend>Conditions</legend>
+          <label class="check">
+            <input type="checkbox" name="glucose_fasting" {% if values.get('glucose_fasting') %}checked{% endif %}>
+            <span>The glucose reading was taken fasting (no food for 8+ hours)</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="hypertension_dx" {% if values.get('hypertension_dx') %}checked{% endif %}>
+            <span>I've been diagnosed with high blood pressure</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="heart_disease" {% if values.get('heart_disease') %}checked{% endif %}>
+            <span>I've been diagnosed with heart disease</span>
+          </label>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" class="btn btn-ghost step-btn" data-dir="-1">← Back</button>
+          <button type="button" class="btn btn-primary step-btn" data-dir="1">Next →</button>
+          <button type="submit" class="btn btn-primary submit-btn">Get my plan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

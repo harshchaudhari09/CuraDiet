@@ -167,4 +167,15 @@ def get_metrics_summary(metrics: Optional[dict]) -> Optional[dict]:
         "recall": round(at_t["recall_sensitivity"] * 100, 1),
         "screening_recall": round(test["at_screening_threshold"]["recall_sensitivity"] * 100, 1),
         "n_test": metrics["n_test"],
+        "n_train": metrics["n_train"],
+        "prevalence": round(metrics["prevalence"] * 100, 1),
+        "baseline_accuracy": round(test["majority_class_baseline_accuracy"] * 100, 1),
+        # Candidate models from cross-validation, weakest first, for the comparison chart
+        "cv": sorted(
+            (
+                {"name": name, "roc_auc": scores["cv_roc_auc"]}
+                for name, scores in metrics.get("cv_model_comparison", {}).items()
+            ),
+            key=lambda m: m["roc_auc"],
+        ),
     }

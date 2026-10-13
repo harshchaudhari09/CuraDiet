@@ -1,89 +1,149 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Your Plan — CuraDiet</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <div class="container">
-    <h1>Your Results</h1>
+{% extends "base.html" %}
+{% block title %}Your Plan — CuraDiet{% endblock %}
+{% block body_class %}page-result{% endblock %}
+{% block nav_cta %}<a class="btn btn-primary btn-sm" href="/#check">New check</a>{% endblock %}
+
+{% block content %}
+{# Which band the model's probability alone falls in, so we can say when lab values raised it. #}
+{% set screening_pct = (thresholds.screening * 100)|round(0)|int %}
+{% set decision_pct = (thresholds.decision * 100)|round(0)|int %}
+{% if risk_prob >= decision_pct %}{% set model_level = "High" %}{% elif risk_prob >= screening_pct %}{% set model_level = "Elevated" %}{% else %}{% set model_level = "Low" %}{% endif %}
+{% set level_key = risk.level|lower %}
+
+<main class="result">
+  <div class="wrap">
+    <header class="result-head">
+      <p class="eyebrow hero-in" style="--d:.05s">Your results</p>
+      <h1 class="result-title hero-in" style="--d:.12s">Here's your <em>plan.</em></h1>
+    </header>
 
     {% for w in diet.warnings %}
-      <div class="errors" role="alert">{{ w }}</div>
+      <div class="alert alert-warn reveal" role="alert">{{ w }}</div>
     {% endfor %}
 
-    <div class="card risk-{{ risk.level|lower }}">
-      <h2>Diabetes risk: {{ risk.level }}</h2>
-      <p>Model-estimated probability: <strong>{{ risk_prob }}%</strong></p>
-      <div class="meter" aria-hidden="true"><span style="width: {{ [risk_prob, 2]|max }}%"></span></div>
-      {% if risk.clinical_flags %}
-        <ul class="flags">
-          {% for f in risk.clinical_flags %}<li>{{ f }}</li>{% endfor %}
-        </ul>
-      {% endif %}
-      <p class="muted">
-        <strong>Low</strong> = below the screening threshold ·
-        <strong>Elevated</strong> = worth a check-up / lifestyle changes ·
-        <strong>High</strong> = model or lab values point to likely diabetes — see a doctor.
-      </p>
-    </div>
-
-    <div class="card">
-      <h2>{{ diet.label }}</h2>
-      <div class="stats">
-        <div><strong>{{ "{:,}".format(diet.daily_calories) }}</strong><span>kcal / day</span></div>
-        <div><strong>{{ diet.protein_g }} g</strong><span>protein ({{ diet.macro_percentages.protein }}%)</span></div>
-        <div><strong>{{ diet.carbs_g }} g</strong><span>carbs ({{ diet.macro_percentages.carbs }}%)</span></div>
-        <div><strong>{{ diet.fat_g }} g</strong><span>fat ({{ diet.macro_percentages.fat }}%)</span></div>
+    <section class="risk-card risk-{{ level_key }} reveal" id="riskCard">
+      <div class="gauge-wrap">
+        <svg class="gauge" viewBox="0 -14 220 142" role="img" aria-label="Model-estimated probability {{ risk_prob }}%">
+          <path class="g-zone g-low" d="M20 110 A90 90 0 0 1 200 110" pathLength="100" style="stroke-dasharray:{{ screening_pct }} 100"/>
+          <path class="g-zone g-mid" d="M20 110 A90 90 0 0 1 200 110" pathLength="100" style="stroke-dasharray:{{ decision_pct - screening_pct }} 100;stroke-dashoffset:-{{ screening_pct }}"/>
+          <path class="g-zone g-high" d="M20 110 A90 90 0 0 1 200 110" pathLength="100" style="stroke-dasharray:{{ 100 - decision_pct }} 100;stroke-dashoffset:-{{ decision_pct }}"/>
+          <path class="g-value" d="M20 110 A90 90 0 0 1 200 110" pathLength="100" style="--v:{{ [risk_prob, 1]|max }}"/>
+          {# threshold ticks sit on the arc: rotate a vertical tick around the centre #}
+          {% for pct in [screening_pct, decision_pct] %}
+            {% set ang = pct * 1.8 - 90 %}
+            <g class="g-tick" transform="rotate({{ ang }} 110 110)">
+              <line x1="110" y1="10" x2="110" y2="30"/>
+              <text x="110" y="2" transform="rotate({{ -ang }} 110 2)">{{ pct }}%</text>
+            </g>
+          {% endfor %}
+          <g class="g-needle" style="--a:{{ ([risk_prob, 1]|max) * 1.8 - 90 }}deg">
+            <line x1="110" y1="110" x2="110" y2="34"/>
+            <circle cx="110" cy="110" r="6"/>
+          </g>
+        </svg>
+        <div class="gauge-ticks" aria-hidden="true">
+          <span>0%</span><span class="gauge-key"><i class="k-low"></i>Low<i class="k-mid"></i>Elevated<i class="k-high"></i>High</span><span>100%</span>
+        </div>
       </div>
 
-      <h3>Daily targets & limits</h3>
-      <table>
-        <tr><td>Fibre</td><td>at least {{ diet.fiber_g }} g</td></tr>
-        <tr><td>Sodium</td><td>under {{ "{:,}".format(diet.sodium_mg) }} mg</td></tr>
-        <tr><td>Added sugar</td><td>under {{ diet.added_sugar_g }} g</td></tr>
-        <tr><td>Saturated fat</td><td>under {{ diet.saturated_fat_g }} g</td></tr>
-        <tr><td>BMI</td><td>{{ diet.bmi }} ({{ diet.bmi_category }})</td></tr>
-        <tr><td>Blood pressure</td><td>{{ diet.bp_category }}</td></tr>
-      </table>
+      <div class="risk-copy">
+        <span class="level-chip level-{{ level_key }}">{{ risk.level }} risk</span>
+        <h2>Diabetes risk: {{ risk.level }}</h2>
+        <p class="risk-prob">Model-estimated probability: <strong><span data-count="{{ risk_prob }}" data-decimals="1">{{ risk_prob }}</span>%</strong></p>
+        {% if risk.level != model_level %}
+          <p class="override-note">The model alone puts you in the <strong>{{ model_level }}</strong> band — your lab values raised this to <strong>{{ risk.level }}</strong> using the official ADA cut-offs.</p>
+        {% endif %}
+        {% if risk.clinical_flags %}
+          <ul class="flags">
+            {% for f in risk.clinical_flags %}<li>{{ f }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+        <p class="legend-text">
+          <strong>Low</strong> = below the screening threshold ·
+          <strong>Elevated</strong> = worth a check-up / lifestyle changes ·
+          <strong>High</strong> = model or lab values point to likely diabetes — see a doctor.
+        </p>
+      </div>
+    </section>
 
-      <h3>How to split your day</h3>
-      <table>
-        <tr><th>Meal</th><th>kcal</th><th>Carbs</th><th>Protein</th></tr>
-        {% for name, m in diet.meals.items() %}
-          <tr><td>{{ name }}</td><td>{{ m.calories }}</td><td>{{ m.carbs_g }} g</td><td>{{ m.protein_g }} g</td></tr>
-        {% endfor %}
-      </table>
-
-      <div class="two-col">
+    <section class="plan-card reveal">
+      <div class="plan-top">
         <div>
-          <h3>Eat more of</h3>
+          <p class="panel-k">Your diet plan</p>
+          <h2 class="plan-label">{{ diet.label }}</h2>
+        </div>
+        <div class="plan-macros">
+          <div class="donut" style="--p:{{ diet.macro_percentages.protein }};--c:{{ diet.macro_percentages.carbs }};--f:{{ diet.macro_percentages.fat }}">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="donut-track" cx="60" cy="60" r="50" pathLength="100"/>
+              <circle class="donut-seg seg-protein" cx="60" cy="60" r="50" pathLength="100"/>
+              <circle class="donut-seg seg-carbs" cx="60" cy="60" r="50" pathLength="100"/>
+              <circle class="donut-seg seg-fat" cx="60" cy="60" r="50" pathLength="100"/>
+            </svg>
+            <div class="donut-center"><b data-count="{{ diet.daily_calories }}" data-format="comma">{{ "{:,}".format(diet.daily_calories) }}</b><span>kcal / day</span></div>
+          </div>
+          <ul class="macro-legend">
+            <li><i class="sw sw-protein"></i>Protein <b>{{ diet.protein_g }} g</b><small>{{ diet.macro_percentages.protein }}%</small></li>
+            <li><i class="sw sw-carbs"></i>Carbs <b>{{ diet.carbs_g }} g</b><small>{{ diet.macro_percentages.carbs }}%</small></li>
+            <li><i class="sw sw-fat"></i>Fat <b>{{ diet.fat_g }} g</b><small>{{ diet.macro_percentages.fat }}%</small></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 class="sub-h">Daily targets &amp; limits</h3>
+      <div class="targets">
+        <div class="target reveal"><span>Fibre</span><b>≥ {{ diet.fiber_g }} g</b><small>at least</small></div>
+        <div class="target reveal" data-delay="1"><span>Sodium</span><b>&lt; {{ "{:,}".format(diet.sodium_mg) }} mg</b><small>under</small></div>
+        <div class="target reveal" data-delay="2"><span>Added sugar</span><b>&lt; {{ diet.added_sugar_g }} g</b><small>under</small></div>
+        <div class="target reveal" data-delay="3"><span>Saturated fat</span><b>&lt; {{ diet.saturated_fat_g }} g</b><small>under</small></div>
+        <div class="target reveal"><span>BMI</span><b>{{ diet.bmi }}</b><small>{{ diet.bmi_category }}</small></div>
+        <div class="target reveal" data-delay="1"><span>Blood pressure</span><b class="b-sm">{{ diet.bp_category }}</b><small>today's reading</small></div>
+      </div>
+
+      <h3 class="sub-h">How to split your day</h3>
+      {% set max_kcal = diet.meals.values()|map(attribute='calories')|max %}
+      <div class="meals">
+        {% for name, m in diet.meals.items() %}
+          <div class="meal reveal" {% if loop.index0 % 4 %}data-delay="{{ loop.index0 % 4 }}"{% endif %}>
+            <div class="meal-name">{{ name }}</div>
+            <div class="meal-bar"><i style="--w:{{ (m.calories / max_kcal * 100)|round(1) }}%"></i></div>
+            <div class="meal-nums"><b>{{ m.calories }} kcal</b><span>{{ m.carbs_g }} g carbs · {{ m.protein_g }} g protein</span></div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="food-cols">
+        <div class="food-col food-more reveal">
+          <h3 class="sub-h">Eat more of</h3>
           <ul>{% for f in diet.foods_to_emphasize %}<li>{{ f }}</li>{% endfor %}</ul>
         </div>
-        <div>
-          <h3>Limit</h3>
+        <div class="food-col food-limit reveal" data-delay="1">
+          <h3 class="sub-h">Limit</h3>
           <ul>{% for f in diet.foods_to_limit %}<li>{{ f }}</li>{% endfor %}</ul>
         </div>
       </div>
 
-      <h3>Why these numbers?</h3>
-      <ul>
-        {% for note in diet.notes %}
-          <li>{{ note }}</li>
-        {% endfor %}
-      </ul>
-    </div>
+      <div class="why reveal">
+        <h3 class="sub-h">Why these numbers?</h3>
+        <ul>
+          {% for note in diet.notes %}
+            <li>{{ note }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
 
     {% if metrics %}
-      <p class="muted">
+      <p class="model-note reveal">
         Model: {{ metrics.model }} · {{ metrics.accuracy }}% accuracy and ROC-AUC {{ metrics.roc_auc }}
         on {{ "{:,}".format(metrics.n_test) }} held-out patients. Not a diagnosis.
       </p>
     {% endif %}
 
-    <a href="/" class="back-link">&larr; Try again</a>
+    <div class="result-actions reveal">
+      <a href="/#check" class="btn btn-ghost back-link">&larr; Try again</a>
+      <button type="button" class="btn btn-primary" onclick="window.print()">Save plan as PDF</button>
+    </div>
   </div>
-</body>
-</html>
+</main>
+{% endblock %}
